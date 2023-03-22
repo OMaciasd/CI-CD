@@ -1,0 +1,104 @@
+variables:
+    TEST_VAR: "Begin - Update all git submodule in Etecnic projects."
+    COMMIT: "GIT"
+
+stages:
+    - Setup
+    - Build
+    - test
+    - Lint
+    - Publish
+    - Deploy
+
+# Define a hidden job to be used with extends
+# Better than default to avoid activating cache for all jobs
+# This folder is cached between builds
+.dependencies_cache:
+    cache:
+    key:
+        files:
+        - artifacts.txt # (6)
+    paths:
+        - text/ # (2)
+    policy: pull
+    only:
+        - main
+
+build-job1:
+    stage: Build
+    tags:
+        - it
+    script:
+        - echo $TEST_VAR
+        - mkdir -p /home/gitlab-runner/.ssh
+    only:
+        - main
+
+setup-job1:
+    stage: Setup
+    script:
+        - echo "Begin setup..."
+    only:
+        - main
+
+test-job1:
+    stage: test
+    needs: [build-job1]
+    extends: .test-prd
+    only:
+        variables: [ $CI_PIPELINE_SOURCE == "push" ]
+
+lint-job1:
+    stage: Lint
+    script:
+        - echo "Begin lint..."
+    only:
+        - main
+
+publish-job1:
+    stage: Publish
+    script:
+        - echo "Begin publish..."
+    only:
+        - main
+
+deploy-job1:
+    stage: Deploy
+    needs: [build-job1]
+    environment:
+        name: main
+    extends: .deploy-prd
+    rules:
+    - if: $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - when: always
+
+.deploy-prd:
+    before_script:
+        - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+        - eval $(ssh-agent -s)
+        - echo "$DOCKER" | tr -d '\r' | ssh-add - > /dev/null
+        - chmod 700 ~/.ssh
+        - git config --global user.name "${GITLAB_USER_NAME}"
+        - git config --global user.email "${GITLAB_USER_EMAIL}"
+        - echo "${CI_COMMIT_MESSAGE}" "${GITLAB_USER_EMAIL}" "${CI_REPOSITORY_URL}" "$CI_SERVER_HOST"
+        - url_host=$(echo "${CI_REPOSITORY_URL}" | sed -e 's|https\?://gitlab-ci-token:.*@|ssh://git@|g')
+        - echo "${url_host}"
+        - ssh-keyscan "$CI_SERVER_HOST" >> ~/.ssh/known_hosts
+        - chmod 644 ~/.ssh/known_hosts
+
+    script:
+    - git branch
+    - git checkout main
+    - git pull origin main
+    - git submodule update --remote
+    - echo 1 >> update.txt
+    - git status
+    - git add -A
+    - git commit -m "$COMMIT"
+    - git push ${url_host} -o ci.skip
+
+.test-prd:
+    script: exit
+    only:
+        - main
