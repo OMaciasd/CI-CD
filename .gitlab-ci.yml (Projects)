@@ -1,5 +1,5 @@
 variables:
-    TEST_VAR: "Begin - Update all git submodule in Etecnic projects."
+    TEST_VAR: "Begin - Continue all git submodule in projects."
     COMMIT: "GIT"
 
 stages:
@@ -22,7 +22,7 @@ stages:
         - text/ # (2)
     policy: pull
     only:
-        - main
+        - staging
 
 build-job1:
     stage: Build
@@ -32,14 +32,14 @@ build-job1:
         - echo $TEST_VAR
         - mkdir -p /home/gitlab-runner/.ssh
     only:
-        - main
+        - staging
 
 setup-job1:
     stage: Setup
     script:
         - echo "Begin setup..."
     only:
-        - main
+        - staging
 
 test-job1:
     stage: test
@@ -53,14 +53,14 @@ lint-job1:
     script:
         - echo "Begin lint..."
     only:
-        - main
+        - staging
 
 publish-job1:
     stage: Publish
     script:
         - echo "Begin publish..."
     only:
-        - main
+        - staging
 
 deploy-job1:
     stage: Deploy
@@ -71,7 +71,7 @@ deploy-job1:
     rules:
     - if: $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
       when: never
-    - when: always
+    - when: staging
 
 .deploy-prd:
     before_script:
@@ -101,4 +101,4 @@ deploy-job1:
 .test-prd:
     script: exit
     only:
-        - main
+        - staging
