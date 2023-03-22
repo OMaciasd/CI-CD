@@ -15,12 +15,5 @@ trigger_A:
     stage: triggers
     when: on_success
     trigger:
-        project: pruebas-it/it_etecnic
-        branch: "$BRANCH"
-
-trigger_B:
-    stage: triggers
-    when: on_success
-    trigger:
-        project: pruebas-it/it_ocpi
+        project: project/project_a # SPECIFY PROJECT TO RUN THE TRIGGER.
         branch: "$BRANCH"
