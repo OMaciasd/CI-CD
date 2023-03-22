@@ -1,5 +1,5 @@
 variables:
-    TEST_VAR: "Begin - Update all git submodule in projects."
+    TEST_VAR: "Begin - Continue all git submodule in projects."
     BRANCH: main
 
 stages:
