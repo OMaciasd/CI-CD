@@ -1,0 +1,26 @@
+variables:
+    TEST_VAR: "Begin - Update all git submodule in projects."
+    BRANCH: main
+
+stages:
+    - build
+    - triggers
+
+job1:
+    stage: build
+    script:
+        - echo $TEST_VAR
+
+trigger_A:
+    stage: triggers
+    when: on_success
+    trigger:
+        project: pruebas-it/it_etecnic
+        branch: "$BRANCH"
+
+trigger_B:
+    stage: triggers
+    when: on_success
+    trigger:
+        project: pruebas-it/it_ocpi
+        branch: "$BRANCH"
