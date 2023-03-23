@@ -11,7 +11,7 @@
 ## Requirements.
 
 - Have a GitLab Account.
-- Have a Server for the private corridor (EC2, WSL, Docker, Ubuntu, VM)
+- Have a Server for the private runner (EC2, WSL, Docker, Ubuntu, VM)
 - Create or clone Two or more projects with repositories and submodules.
 
 ## Walkthrought.
