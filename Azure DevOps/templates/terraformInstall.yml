@@ -1,0 +1,5 @@
+steps:
+- task: TerraformInstaller@0
+  displayName:  "00 - Install Terraform"
+  inputs:
+    terraformVersion: '0.14.9'

@@ -1,0 +1,145 @@
+name: '$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)'
+
+variables:
+- name: Major
+  value: 1
+- name: Minor
+  value: 0
+- name: Patch
+  value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
+
+
+resources:
+  repositories:
+    - repository: organization-infra
+      type: git
+      name: "product development/organization-infra"
+
+trigger:
+    batch: true
+    tags:
+        include:
+            - "*"
+    branches:
+        include:
+            - main
+    paths:
+        include:
+            - src
+        exclude:
+            - docs
+
+pool: "Agent Pool organization"
+
+stages:
+  - stage: "Build"
+    jobs:
+    - deployment: build
+      continueOnError: false
+      environment: 'dev'
+      variables:
+      - group: dev-key-vault-credential
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+
+              - template: 'templates/installJava.yml@organization-infra'
+
+              - template: 'templates/installSOPS.yml@organization-infra'
+
+              - template: 'templates/decryptSOPS.yml@organization-infra'
+                parameters:
+                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
+                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+
+              - template: 'templates/dotnetBuild.yml@organization-infra'
+                parameters:
+                  SonarProjectKey: "organization_organization-backoffice-api"
+                  SonarProjectName: "organization-backoffice-api"
+                  PublishProject: "organization.BackOffice.Api.Web.csproj"
+
+              - template: "templates/snykTest.yml@organization-infra"
+                parameters:
+                  SolutionPath: "./src/organization.BackOffice.Api.sln"
+
+  - stage: "Build_sta"
+    dependsOn: "Build"
+    condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+    jobs:
+    - deployment: build
+      continueOnError: false
+      environment: 'sta'
+      variables:
+      - group: dev-key-vault-credential
+      strategy:
+       runOnce:
+         deploy:
+           steps:
+             - checkout: self
+
+             - template: 'templates/installJava.yml@organization-infra'
+
+             - template: 'templates/installSOPS.yml@organization-infra'
+
+             - template: 'templates/decryptSOPS.yml@organization-infra'
+               parameters:
+                 FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
+                 DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+
+             - template: 'templates/dotnetBuild.yml@organization-infra'
+               parameters:
+                SonarProjectKey: "organization_organization-backoffice-api"
+                SonarProjectName: "organization-backoffice-api"
+                PublishProject: "organization.BackOffice.Api.Web.csproj"
+
+  - stage: "Build_prd"
+    dependsOn: "Build"
+    condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+    jobs:
+    - deployment: build
+      continueOnError: false
+      environment: 'prd'
+      variables:
+      - group: dev-key-vault-credential
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+
+              - template: 'templates/installJava.yml@organization-infra'
+
+              - template: 'templates/installSOPS.yml@organization-infra'
+
+              - template: 'templates/decryptSOPS.yml@organization-infra'
+                parameters:
+                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
+                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+
+              - template: 'templates/dotnetBuild.yml@organization-infra'
+                parameters:
+                  SonarProjectKey: "organization_organization-backoffice-api"
+                  SonarProjectName: "organization-backoffice-api"
+                  PublishProject: "organization.BackOffice.Api.Web.csproj"
+
+# organization-backoffice-api - DEV - Release Azure DevOps.
+steps:
+- task: AzureRmWebAppDeployment@4
+  displayName: 'Deploy Azure App Service'
+  inputs:
+    azureSubscription: 'Azure subscription 1 (443c2864-91d7-499d-877b-04179227ab3b)'
+    appType: webAppLinux
+    WebAppName: 'dev-organization-backoffice-api'
+    AppSettings: '-TZ America/Lima'
+
+# organization-backoffice-api - STA - Release Azure DevOps.
+steps:
+- task: AzureRmWebAppDeployment@4
+  displayName: 'Azure App Service Deploy: sta-organization-backoffice-api'
+  inputs:
+    azureSubscription: 'Azure subscription 1 (443c2864-91d7-499d-877b-04179227ab3b)'
+    appType: webAppLinux
+    WebAppName: 'sta-organization-backoffice-api'
+    AppSettings: '-TZ America/Lima'

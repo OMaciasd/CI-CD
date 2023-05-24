@@ -1,0 +1,16 @@
+steps:
+ - task: Bash@3
+   displayName:  "00 - Install SOPS"
+   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+   inputs:
+     targetType: 'inline'
+     script: |
+       export AZURE_CLIENT_ID=$(AZURE-CLIENT-ID)
+       export AZURE_TENANT_ID=$(AZURE-TENANT-ID)
+       export AZURE_CLIENT_SECRET=$(AZURE-CLIENT-SECRET)
+                 
+       echo "Download sops 3.3.1"
+       wget https://github.com/mozilla/sops/releases/download/3.3.1/sops_3.3.1_amd64.deb
+
+       echo "Install sops 3.3.1"
+       sudo apt install ./sops_3.3.1_amd64.deb

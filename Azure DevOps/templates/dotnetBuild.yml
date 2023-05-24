@@ -1,0 +1,83 @@
+parameters:
+  SonarProjectKey: ""
+  SonarProjectName: ""
+  PublishProject: ""
+
+steps:
+  # - script: |
+  #     rm -f src/**/**.enc.json
+  #     rm -f src/**/appsettings.Development.json
+  #   continueOnError: true
+  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  #   displayName: "T00 - Delete Not Required Files"
+
+  - task: DotNetCoreCLI@2
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      command: restore
+      projects: "**/*.sln"
+    displayName: "T01 - Dotnet restore"
+
+  - task: SonarCloudPrepare@1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      SonarCloud: "Sonar Cloud"
+      organization: "ORGANIZATION"
+      scannerMode: "MSBuild"
+      projectKey: "${{parameters.SonarProjectKey}}"
+      projectName: "${{parameters.SonarProjectName}}"
+      projectVersion: "$(Build.BuildNumber)"
+      extraProperties: 'sonar.cs.opencover.reportsPaths=$(Build.Repository.LocalPath)\src\**\Results\*.xml'
+    displayName: "T02 - Sonar Cloud Prepare"
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      projects: "**/*.sln"
+      arguments: "--configuration Release"
+    displayName: "T03 - Build"
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: test
+      projects: "**/*.sln"
+      arguments: "--configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./Results/"
+    displayName: "T04 - Test"
+
+  - task: SonarCloudAnalyze@1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    continueOnError: false
+    displayName: "T05 - Sonar Cloud Analyze"
+
+  - task: SonarCloudPublish@1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      pollingTimeoutSec: "300"
+    displayName: "T06 - Sonar Cloud Publish"
+
+  - task: DotNetCoreCLI@2
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      command: publish
+      projects: "src/**/${{parameters.PublishProject}}"
+      publishWebProjects: false
+      arguments: "--configuration Release --output $(build.artifactstagingdirectory)"
+      zipAfterPublish: True
+    displayName: "T08 - Publish locally"
+
+  - task: PublishBuildArtifacts@1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    inputs:
+      PathtoPublish: "$(build.artifactstagingdirectory)"
+    displayName: "T09 - Publish to Azure DevOps Artifacts"
+
+  - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+    displayName: "T10 - Tag Build Stage"
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranch'], '-rc'))
+    inputs:
+      tags: "rc-build"
+
+  - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+    displayName: "T10 - Tag Build Production"
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranch'], '-ga'))
+    inputs:
+      tags: "ga-build"

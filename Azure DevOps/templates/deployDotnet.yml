@@ -1,0 +1,80 @@
+parameters:
+  FileToDecryptFileWithPath: ""
+  DecryptedFileWithPath: ""
+  DeploymentName: ""
+  WebAppName: ""
+  IsWebApp: false
+  IsFunction: false
+
+steps:
+- task: AzureKeyVault@2
+  displayName: "T00 - Keyvault secrets"
+  inputs:
+    azureSubscription: 'ORGANIZATION Azure service connection'
+    KeyVaultName: 'dev-kv-devops-ORGANIZATION'
+    SecretsFilter: '*'
+    RunAsPreJob: false
+
+- task: ExtractFiles@1
+  displayName: "T01 - Unzip artifact"
+  inputs:
+    archiveFilePatterns: '$(Pipeline.Workspace)/**/*.zip'
+    destinationFolder: '$(Pipeline.Workspace)/build'
+    cleanDestinationFolder: true
+    overwriteExistingFiles: false
+
+- bash: |
+    FILES=(${{ parameters.FileToDecryptFileWithPath }})
+    echo "##vso[task.setVariable variable=FILEEXISTS]false"
+    if [ -f "${FILES[0]}" ]; then
+        echo "##vso[task.setVariable variable=FILEEXISTS]true"
+    fi
+  displayName: "T02 - Check if file exist"
+
+- task: Bash@3
+  condition: eq(variables.FILEEXISTS, 'true')
+  displayName:  "T02 - Decrypt SOPS"
+  inputs:
+    targetType: 'inline'
+    script: |
+      export AZURE_CLIENT_ID=$(AZURE-CLIENT-ID)
+      export AZURE_TENANT_ID=$(AZURE-TENANT-ID)
+      export AZURE_CLIENT_SECRET=$(AZURE-CLIENT-SECRET)
+      sops -d ${{ parameters.FileToDecryptFileWithPath }} > ${{ parameters.DecryptedFileWithPath }}
+
+- script: |
+      rm -f $(Pipeline.Workspace)/**/**.enc.json
+      rm -f $(Pipeline.Workspace)/**/appsettings.Development.json
+  continueOnError: true
+  displayName: "T03 - Delete Not Required Files"
+
+- task: ArchiveFiles@2
+  displayName: "T04 - Zip artifact to deploy"
+  inputs:
+    rootFolderOrFile: '$(Pipeline.Workspace)/build'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/${{parameters.DeploymentName}}-$(Build.BuildId).zip'
+    replaceExistingArchive: true
+
+- ${{if eq(parameters.IsWebApp, true)}}:
+  - task: AzureRmWebAppDeployment@4
+    displayName: "T05 - Deploy to App Service"
+    inputs:
+      ConnectionType: 'AzureRM'
+      azureSubscription: 'Azure'
+      appType: 'webAppLinux'
+      WebAppName: "${{parameters.WebAppName}}"
+      packageForLinux: '$(Build.ArtifactStagingDirectory)/*.zip'
+      AppSettings: '-TZ America/Lima'
+
+- ${{if eq(parameters.IsFunction, true)}}:
+  - task: AzureFunctionApp@1
+    displayName: "T05 - Deploy to Azure Function"
+    inputs:
+      azureSubscription: 'ORGANIZATION Azure service connection'
+      appType: 'functionAppLinux'
+      appName: "${{parameters.WebAppName}}"
+      package: '$(Build.ArtifactStagingDirectory)/*.zip'
+      runtimeStack: 'DOTNET|6.0'
+      appSettings: '-TZ America/Lima'

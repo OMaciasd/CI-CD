@@ -1,0 +1,252 @@
+# TODO: To be removed as soon as we have ./pipelines/ci.yml configured & published
+
+# Node.js
+# Build a general Node.js project with npm.
+# Taks on this CI:
+#   - Install node;
+#   - Download variable information securely from the "Secure Files" repository
+#   - Run test scripts (snyk)
+#   - Make the compilation
+#   - Make the artifact available
+name: "$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)"
+
+variables:
+    - name: Major
+      value: 1
+    - name: Minor
+      value: 0
+    - name: Patch
+      value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
+
+resources:
+    repositories:
+        - repository: OR-infra
+          type: git
+          name: "product development/OR-infra"
+
+trigger:
+    batch: true
+    tags:
+        include:
+            - "*"
+    branches:
+        include:
+            - main
+    paths:
+        include:
+            - src
+        exclude:
+            - docs
+
+pool: "Agent Pool OR"
+
+stages:
+    - stage: "Build"
+      jobs:
+          - deployment: build
+            continueOnError: false
+            environment: "dev"
+            variables:
+                - group: dev-key-vault-credential
+            strategy:
+                runOnce:
+                    deploy:
+                        steps:
+                            - checkout: self
+                              persistCredentials: true
+                            - template: "templates/installzip.yml@OR-infra"
+                              parameters:
+                                  message: "00 - Install Zip"
+
+                            - template: "templates/installJava.yml@OR-infra"
+
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: "16.16.0"
+                              displayName: "01 - Install Node.js"
+
+                            - task: SonarCloudPrepare@1
+                              inputs:
+                                  SonarCloud: "Sonar Cloud"
+                                  organization: "OR"
+                                  scannerMode: "CLI"
+                                  configMode: "manual"
+                                  cliProjectKey: "OR_OR-backoffice-ui"
+                                  cliProjectName: "OR-backoffice-ui"
+                                  cliSources: "."
+                                  extraProperties: "sonar.javascript.lcov.reportPaths=./coverage/lcov.info"
+                              displayName: "03 - Sonar Cloud Prepare"
+
+                            - script: |
+                                  git config --global user.email 'dev.tools@progresol.com'
+                                  git config --global user.name 'Dev Tool Progresol'
+                              continueOnError: true
+                              displayName: "04 - Git Name and User"
+
+                            - script: |
+                                  npm install -g yarn
+                                  yarn -v
+                                  yarn install
+                              continueOnError: true
+                              displayName: "05 - Yarn Install"
+
+                            - script: |
+                                  yarn run standard-version
+                                  current_message=$(git show -s --format=%s)
+                                  echo $current_message
+                                  commit_message="${current_message} [ci skip]"
+                                  echo $commit_message
+                                  git commit --amend -m --no-verify "$commit_message"
+                                  git push --follow-tags --no-verify origin HEAD:$(Build.SourceBranchName)
+                              continueOnError: true
+                              displayName: "06 - Run Version"
+
+                            - template: "templates/installSOPS.yml@OR-infra"
+
+                            #- template: "templates/decryptSOPS.yml@OR-infra"
+                            #  parameters:
+                            #      FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
+                            #      DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env.development"
+
+                            - script: |
+                                  yarn run build:dev
+                                 # yarn build-storybook
+                              displayName: "07 - Build"
+                              continueOnError: false
+
+                            - script: |
+                                  #yarn run jest --json --outputFile=output.json
+                                  yarn test --coverage
+                              continueOnError: true
+                              displayName: "08 - Testing"
+
+                            - task: PublishCodeCoverageResults@1
+                              inputs:
+                                  codeCoverageTool: Cobertura
+                                  summaryFileLocation: "$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml"
+                              displayName: "09 - Publish Tests PublishCodeCoverageResults"
+
+                            - task: PublishTestResults@2
+                              inputs:
+                                  testResultsFormat: "JUnit"
+                                  testResultsFiles: "**/*unit.xml"
+                                  mergeTestResults: true
+                              displayName: "10 - Publish Tests Results"
+
+                            - task: SonarCloudAnalyze@1
+                              continueOnError: false
+                              displayName: "11 - Sonar Cloud Analyze"
+
+                            - task: SonarCloudPublish@1
+                              inputs:
+                                  pollingTimeoutSec: "300"
+                              displayName: "12 - Sonar Cloud Publish"
+
+                            - task: SnykSecurityScan@1
+                              inputs:
+                                  serviceConnectionEndpoint: "snyk"
+                                  testType: "app"
+                                  monitorWhen: "always"
+                                  failOnIssues: false
+                              continueOnError: true
+                              displayName: "13 - Security Scan"
+
+                            - task: ArchiveFiles@2
+                              inputs:
+                                  rootFolderOrFile: "."
+                                  includeRootFolder: false
+                                  archiveType: "zip"
+                                  archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+                                  replaceExistingArchive: true
+                              displayName: "14 - Publish locally"
+
+                            - task: PublishBuildArtifacts@1
+                              inputs:
+                                  PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+                                  ArtifactName: "drop"
+                              displayName: "15 - Publish to Azure DevOps Artifacts"
+
+    - stage: "Build_Sta_Prd"
+      dependsOn: "Build"
+      condition: and(succeeded(),or(contains(variables['Build.SourceBranch'], '-rc'), contains(variables['Build.SourceBranch'], '-ga')))
+      jobs:
+          - deployment: build_sta_prd
+            continueOnError: false
+            environment: "sta"
+            variables:
+                - group: dev-key-vault-credential
+            strategy:
+                runOnce:
+                    deploy:
+                        steps:
+                            - checkout: self
+
+                            - script: |
+                                  echo "Current Environment is: $(entorno)"
+                                  echo "##vso[task.setvariable variable=entorno;]sta"
+                                  echo "Current Environment is: $(entorno)"
+                              continueOnError: true
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+                              displayName: "00 - Check If It is Sta"
+
+                            - script: |
+                                  echo "Current Environment is: $(entorno)"
+                                  echo "##vso[task.setvariable variable=entorno;]prd"
+                                  echo "Current Environment is: $(entorno)"
+                              continueOnError: true
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+                              displayName: "00 - Check If It is Prd"
+
+                            - template: "templates/installzip.yml@OR-infra"
+                              parameters:
+                                  message: "00 - Install Zip"
+
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: "16.x"
+                              displayName: "01 - Install Node.js"
+
+                            - template: "templates/installSOPS.yml@OR-infra"
+
+                            - template: "templates/decryptSOPS.yml@OR-infra"
+                              parameters:
+                                  FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
+                                  DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env.development"
+
+                            - script: |
+                                  npm install -g yarn
+                                  yarn -v
+                                  yarn install
+                              continueOnError: true
+                              displayName: "04 - Yarn Install"
+
+                            - script: |
+                                  yarn run build:dev
+                              displayName: "07.0 - Build"
+
+                            - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+                              displayName: "07.1 - Tag Build"
+                              inputs:
+                                  tags: "rc-build"
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+
+                            - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+                              displayName: "07.2 - Tag Build"
+                              inputs:
+                                  tags: "ga-build"
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+
+                            - task: ArchiveFiles@2
+                              inputs:
+                                  rootFolderOrFile: "."
+                                  includeRootFolder: false
+                                  archiveType: "zip"
+                                  archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+                                  replaceExistingArchive: true
+                              displayName: "11 - Publish locally"
+
+                            - task: PublishBuildArtifacts@1
+                              inputs:
+                                  PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+                                  ArtifactName: "drop"
+                              displayName: "12 - Publish to Azure DevOps Artifacts"

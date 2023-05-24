@@ -1,0 +1,15 @@
+parameters:
+  SolutionPath: ''
+
+## sample: SolutionPath = './src/ORGANIZATION.Bff.Integration.sln'
+
+steps:
+- task: SnykSecurityScan@1
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  inputs:
+    serviceConnectionEndpoint: 'snyk'
+    targetFile: "${{ parameters.SolutionPath }}"
+    testType: 'app'
+    monitorWhen: 'always'
+    failOnIssues: false
+  displayName: '00 - Security Scan'

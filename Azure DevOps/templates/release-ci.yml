@@ -1,0 +1,179 @@
+pool:
+  vmImage: 'ubuntu-latest'
+
+trigger: none
+
+resources:
+  repositories:
+  - repository: bff-repo
+    type: git
+    name: "product development/ORGANIZATION-bff-integration"
+
+  - repository: marketing-repo
+    type: git
+    name: "product development/OR-marketing-functions"
+
+  - repository: products-repo
+    type: git
+    name: "product development/OR-products-functions"
+
+  - repository: customer-loyalty-repo
+    type: git
+    name: "product development/OR-customer-loyalty-functions"
+
+  - repository: notification-repo
+    type: git
+    name: "product development/OR-notification-functions"
+
+  - repository: payment-repo
+    type: git
+    name: "product development/OR-payments-functions"
+
+  - repository: shipping-date-repo
+    type: git
+    name: "product development/OR-shipping-date-functions"
+
+  - repository: shipping-experience-repo
+    type: git
+    name: "product development/OR-shipping-experience-functions"
+
+  - repository: shipping-reports-repo
+    type: git
+    name: "product development/OR-shipping-reports-functions"
+
+  - repository: ticket-manager-repo
+    type: git
+    name: "product development/OR-ticket-manager-integration"
+
+  - repository: storefront-repo
+    type: git
+    name: "product development/OR-storefront"
+
+  - repository: shippings-integration-custom
+    type: git
+    name: "product development/OR-shippings-integration-custom"
+
+  - repository: back-office-functions-repo
+    type: git
+    name: "product development/OR-back-office-functions"
+
+  - repository: back-office-repo
+    type: git
+    name: "product development/OR-backoffice"
+
+jobs:
+  - job: bff_branch_creation
+    steps:
+      - checkout: bff-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: payment_creation
+    steps:
+      - checkout: payment-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: shipping_date_creation
+    steps:
+      - checkout: shipping-date-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: shipping_experience_creation
+    steps:
+      - checkout: shipping-experience-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: shipping_reports_creation
+    steps:
+      - checkout: shipping-reports-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: ticket_manager_creation
+    steps:
+      - checkout: ticket-manager-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: storefront_creation
+    steps:
+      - checkout: storefront-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: shippings_integration_creation
+    steps:
+      - checkout: shippings-integration-custom
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: marketing_creation
+    steps:
+      - checkout: marketing-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: customer_loyalty_creation
+    steps:
+      - checkout: customer-loyalty-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: notification_creation
+    steps:
+      - checkout: notification-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: products_creation
+    steps:
+      - checkout: products-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: back_office_creation
+    steps:
+      - checkout: back-office-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+  - job: back_office_functions_creation
+    steps:
+      - checkout: back-office-functions-repo
+        persistCredentials: true
+      - bash: |
+          git checkout -b $(FOLDER)/$(VERSION)
+          git push --set-upstream origin $(FOLDER)/$(VERSION)
+
+
+
+
