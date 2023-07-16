@@ -1,0 +1,8 @@
+steps:
+- task: AzureRmWebAppDeployment@4
+  displayName: 'Deploy Azure App Service'
+  inputs:
+    azureSubscription: 'Azure Tenant Account (45u23-5u5c21b710n)'
+    appType: webAppLinux
+    WebAppName: 'environment-organization-project'
+    AppSettings: '-TZ America/Bogota'

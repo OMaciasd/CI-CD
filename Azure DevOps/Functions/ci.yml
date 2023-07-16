@@ -1,0 +1,139 @@
+name: '$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)'
+
+variables:
+- name: Major
+  value: 1
+- name: Minor
+  value: 0
+- name: Patch
+  value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
+
+resources:
+  repositories:
+    - repository: organization-infra
+      type: git
+      name: "product development/organization-infra"
+
+trigger:
+    batch: true
+    tags:
+      include:
+        - ‘*’
+    branches:
+      include:
+      - main
+    paths:
+        include:
+        - src
+        exclude:
+        - docs
+        - pipelines
+
+pool: "Agent Pool Organization"
+
+stages:
+- stage: "Build"
+  jobs:
+  - deployment: build
+    continueOnError: false
+    environment: 'dev'
+    variables:
+    - group: dev-key-vault-credential
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+           - checkout: self
+
+           - template: 'templates/installDotNet.yml@organization-infra'
+
+           - template: 'templates/installJava.yml@organization-infra'
+
+           - template: 'templates/installSOPS.yml@organization-infra'
+
+           - template: 'templates/decryptSOPS.yml@organization-infra'
+             parameters:
+               FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/Organization.Project.Functions.Presentation/local.settings.$(environment.name).enc.json'
+               DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/Organization.Project.Functions.Presentation/local.settings.json'
+
+           - template: 'templates/dotnetBuild.yml@organization-infra'
+             parameters:
+              SonarProjectKey: "organization_organization-sales-orders-functions"
+              SonarProjectName: "organization-sales-orders-functions"
+              PublishProject: "organization.SalesOrders.Functions.Application.Tests.csproj"
+
+           - template: "templates/snykTest.yml@organization-infra"
+             parameters:
+              SolutionPath: "./src/Organization.Project.Functions.sln"
+
+- stage: "Build_Sta"
+  dependsOn: "Build"
+  condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+  jobs:
+  - deployment: build_sta
+    continueOnError: false
+    environment: 'sta'
+    variables:
+        - group: dev-key-vault-credential
+    strategy:
+        runOnce:
+            deploy:
+                steps:
+                    - checkout: self
+
+                    - template: 'templates/installDotNet.yml@organization-infra'
+
+                    - template: 'templates/installJava.yml@organization-infra'
+
+                    - template: 'templates/installSOPS.yml@organization-infra'
+
+                    - template: 'templates/decryptSOPS.yml@organization-infra'
+                      parameters:
+                          FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.CustomerLoyalty.Functions/local.settings.$(environment.name).enc.json'
+                          DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.CustomerLoyalty.Functions/local.settings.json'
+
+                    - template: 'templates/dotnetBuild.yml@organization-infra'
+                      parameters:
+                          SonarProjectKey: "organization_organization-sales-orders-functions"
+                          SonarProjectName: "organization-sales-orders-functions"
+                          PublishProject: "organization.SalesOrders.Functions.Application.Tests.csproj"
+
+                    - template: "templates/snykTest.yml@organization-infra"
+                      parameters:
+                          SolutionPath: "./src/Organization.Project.Functions.sln"
+
+- stage: "Build_Prd"
+  dependsOn: "Build"
+  condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+  jobs:
+  - deployment: build_prd
+    continueOnError: false
+    environment: 'prd'
+    variables:
+        - group: dev-key-vault-credential
+    strategy:
+        runOnce:
+            deploy:
+                steps:
+                    - checkout: self
+
+                    - template: 'templates/installDotNet.yml@organization-infra'
+
+                    - template: 'templates/installJava.yml@organization-infra'
+
+                    - template: 'templates/installSOPS.yml@organization-infra'
+
+                    - template: 'templates/decryptSOPS.yml@organization-infra'
+                      parameters:
+                          FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.CustomerLoyalty.Functions/local.settings.$(environment.name).enc.json'
+                          DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.CustomerLoyalty.Functions/local.settings.json'
+
+                    - template: 'templates/dotnetBuild.yml@organization-infra'
+                      parameters:
+                          SonarProjectKey: "organization_organization-sales-orders-functions"
+                          SonarProjectName: "organization-sales-orders-functions"
+                          PublishProject: "organization.SalesOrders.Functions.Application.Tests.csproj"
+
+                    - template: "templates/snykTest.yml@organization-infra"
+                      parameters:
+                          SolutionPath: "./src/Organization.Project.Functions.sln"

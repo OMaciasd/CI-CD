@@ -47,22 +47,27 @@ stages:
 
               - template: 'templates/installJava.yml@organization-infra'
 
+              - script: |
+                  rm src/Organization.Db.Migrations.Tools.App/appsettings.json
+                continueOnError: false
+                displayName: "02 - Delete Current appsettings.json"
+
               - template: 'templates/installSOPS.yml@organization-infra'
 
               - template: 'templates/decryptSOPS.yml@organization-infra'
                 parameters:
-                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                    FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.$(environment.name).enc.json"
+                    DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.json"
 
-              - template: 'templates/dotnetBuild.yml@organization-infra'
+              - template: "templates/dotnetBuild.yml@organization-infra"
                 parameters:
-                  SonarProjectKey: "organization_organization-backoffice-api"
-                  SonarProjectName: "organization-backoffice-api"
-                  PublishProject: "organization.BackOffice.Api.Web.csproj"
+                    SonarProjectKey: 'organization_organization-db-migrations-tools'
+                    SonarProjectName: 'organization-db-migrations-tools'
+                    PublishProject: 'Organization.Db.Migrations.Tools.App.csproj'
 
               - template: "templates/snykTest.yml@organization-infra"
                 parameters:
-                  SolutionPath: "./src/organization.BackOffice.Api.sln"
+                  SolutionPath: "./src/Organization.Db.Migrations.Tools.App.sln"
 
   - stage: "Build_sta"
     dependsOn: "Build"
@@ -80,19 +85,17 @@ stages:
              - checkout: self
 
              - template: 'templates/installJava.yml@organization-infra'
-
              - template: 'templates/installSOPS.yml@organization-infra'
-
              - template: 'templates/decryptSOPS.yml@organization-infra'
                parameters:
-                 FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                 DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                    FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.$(environment.name).enc.json"
+                    DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.json"
 
              - template: 'templates/dotnetBuild.yml@organization-infra'
                parameters:
-                SonarProjectKey: "organization_organization-backoffice-api"
-                SonarProjectName: "organization-backoffice-api"
-                PublishProject: "organization.BackOffice.Api.Web.csproj"
+                SonarProjectKey: "organization_organization-db-migrations-tools"
+                SonarProjectName: "organization-db-migrations-tools"
+                PublishProject: "Organization.Db.Migrations.Tools.App.Web.csproj"
 
   - stage: "Build_prd"
     dependsOn: "Build"
@@ -115,31 +118,11 @@ stages:
 
               - template: 'templates/decryptSOPS.yml@organization-infra'
                 parameters:
-                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                    FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.$(environment.name).enc.json"
+                    DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/src/Organization.Db.Migrations.Tools.App/appsettings.json"
 
               - template: 'templates/dotnetBuild.yml@organization-infra'
                 parameters:
-                  SonarProjectKey: "organization_organization-backoffice-api"
-                  SonarProjectName: "organization-backoffice-api"
-                  PublishProject: "organization.BackOffice.Api.Web.csproj"
-
-# organization-backoffice-api - DEV - Release Azure DevOps.
-steps:
-- task: AzureRmWebAppDeployment@4
-  displayName: 'Deploy Azure App Service'
-  inputs:
-    azureSubscription: 'Azure subscription 1 (443c2864-91d7-499d-877b-04179227ab3b)'
-    appType: webAppLinux
-    WebAppName: 'dev-organization-backoffice-api'
-    AppSettings: '-TZ America/Lima'
-
-# organization-backoffice-api - STA - Release Azure DevOps.
-steps:
-- task: AzureRmWebAppDeployment@4
-  displayName: 'Azure App Service Deploy: sta-organization-backoffice-api'
-  inputs:
-    azureSubscription: 'Azure subscription 1 (443c2864-91d7-499d-877b-04179227ab3b)'
-    appType: webAppLinux
-    WebAppName: 'sta-organization-backoffice-api'
-    AppSettings: '-TZ America/Lima'
+                  SonarProjectKey: "organization_organization-db-migrations-tools"
+                  SonarProjectName: "organization-db-migrations-tools"
+                  PublishProject: "Organization.Db.Migrations.Tools.App.Web.csproj"
