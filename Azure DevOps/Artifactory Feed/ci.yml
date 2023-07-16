@@ -1,0 +1,152 @@
+# Node.js
+# Build a general Node.js project with npm.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+name: "$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)"
+
+variables:
+    - name: Major
+      value: 1
+    - name: Minor
+      value: 0
+    - name: Patch
+      value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
+
+resources:
+    repositories:
+        - repository: organization-infra
+          type: git
+          name: "product development/organization-infra"
+
+trigger:
+    batch: true
+    tags:
+        include:
+            - "*"
+    branches:
+        include:
+            - main
+    paths:
+        include:
+            - src
+        exclude:
+            - docs
+
+pool: "Agent Pool Organization"
+
+stages:
+    - stage: "Build"
+      jobs:
+          - deployment: build
+            continueOnError: false
+            environment: "dev"
+            variables:
+                - group: environment-key-vault-credential
+            strategy:
+                runOnce:
+                    deploy:
+                        steps:
+                            - checkout: self
+                              persistCredentials: true
+
+                            - script: |
+                                echo "Current Environment is: $(entorno)"
+                                echo "DefaultWorkingDirectory is $(System.DefaultWorkingDirectory)"
+                              displayName: "00 - Environment"
+
+                            - template: "templates/installzip.yml@organization-infra"
+                              parameters:
+                                message: "01 - Install Zip"
+
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: "16.16.0"
+                              displayName: "01 - Install Node.js"
+
+                            - task: SonarCloudPrepare@1
+                              inputs:
+                                  SonarCloud: "Sonar Cloud"
+                                  organization: "organization"
+                                  scannerMode: "CLI"
+                                  configMode: "manual"
+                                  cliProjectKey: "organization_organization-ui-kit"
+                                  cliProjectName: "organization-ui-kit"
+                                  cliSources: "."
+                                  extraProperties: "sonar.javascript.lcov.reportPaths=./coverage/lcov.info"
+                              displayName: "03 - Sonar Cloud Prepare"
+
+                            - script: |
+                                  git config --global user.email 'account@domain.root'
+                                  git config --global user.name 'account Name'
+                              continueOnError: true
+                              displayName: "04 - Git Name and User"
+
+                            - script: |
+                                  npm install -g yarn
+                                  yarn -v
+                                  yarn install
+                              continueOnError: true
+                              displayName: "05 - Yarn Install"
+
+                            - script: |
+                                  yarn build
+                                  yarn pack
+                              displayName: "07 - Build"
+                              continueOnError: false
+
+                            - script: |
+                                  yarn test
+                              continueOnError: false
+                              displayName: "08 - Testing"
+
+                            - script: |
+                                  echo "PublishCodeCoverageResults"
+                              displayName: "09 - Publish Tests PublishCodeCoverageResults"
+
+                            - task: PublishTestResults@2
+                              inputs:
+                                  testResultsFormat: "JUnit"
+                                  testResultsFiles: "**/*unit.xml"
+                                  mergeTestResults: true
+                              displayName: "10 - Publish Tests Results"
+
+                            - task: SonarCloudAnalyze@1
+                              continueOnError: false
+                              displayName: "11 - Sonar Cloud Analyze"
+
+                            - task: SonarCloudPublish@1
+                              inputs:
+                                  pollingTimeoutSec: "300"
+                              displayName: "12 - Sonar Cloud Publish"
+
+                            - task: SnykSecurityScan@1
+                              inputs:
+                                  serviceConnectionEndpoint: "snyk"
+                                  testType: "app"
+                                  monitorWhen: "always"
+                                  failOnIssues: false
+                              continueOnError: true
+                              displayName: "13 - Security Scan"
+
+                            - task: ArchiveFiles@2
+                              inputs:
+                                  rootFolderOrFile: "."
+                                  includeRootFolder: false
+                                  archiveType: "zip"
+                                  archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).tgz"
+                                  replaceExistingArchive: true
+                              displayName: "14 - Publish locally"
+
+                            - task: PublishBuildArtifacts@1
+                              inputs:
+                                  PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+                                  ArtifactName: "drop"
+                              displayName: "15 - Publish to Azure DevOps Artifacts"
+
+                            - task: Npm@1
+                              inputs:
+                                command: 'publish'
+                                verbose: true
+                                publishRegistry: 'useFeed'
+                                publishFeed: '1b-4xu23-733b'

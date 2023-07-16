@@ -1,0 +1,12 @@
+steps:
+- script: |
+   unzip _organization-db-migrations-tools/drop/Organization.Db.Migrations.Tools.App.zip
+
+  displayName: 'Unzip Artifact'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Dotnet update DB by Migrations'
+  inputs:
+    command: custom
+    custom: Organization.Db.Migrations.Tools.App.dll
+    arguments: '--last-migration'

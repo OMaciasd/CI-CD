@@ -1,0 +1,16 @@
+steps:
+- script: |
+   cd _organization-backoffice-ui/drop
+  displayName: Script
+  continueOnError: true
+
+- task: AzureStaticWebApp@0
+  displayName: 'Static Web App: '
+  inputs:
+    app_location: '/_organization-backoffice-ui/drop/'
+    skip_app_build: true
+    skip_api_build: true
+    is_static_export: false
+    verbose: true
+    azure_static_web_apps_api_token: '70k3n-b31-4zu23-2350u2c3-4-57471c-w3d-4qq5'
+  continueOnError: true
