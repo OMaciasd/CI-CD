@@ -1,19 +1,28 @@
-name: '$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)'
+# TODO: To be removed as soon as we have ./pipelines/ci.yml configured & published
+
+# Node.js
+# Build a general Node.js project with npm.
+# Taks on this CI:
+#   - Install node;
+#   - Download variable information securely from the "Secure Files" repository
+#   - Run test scripts (snyk)
+#   - Make the compilation
+#   - Make the artifact available
+name: "$(BuildDefinitionName)_$(Build.SourceBranchName)_$(Major).$(Minor).$(Patch)"
 
 variables:
-- name: Major
-  value: 1
-- name: Minor
-  value: 0
-- name: Patch
-  value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
-
+    - name: Major
+      value: 1
+    - name: Minor
+      value: 0
+    - name: Patch
+      value: $[counter(format('{0}.{1}', variables['Major'], variables['Minor']), 0)]
 
 resources:
-  repositories:
-    - repository: organization-infra
-      type: git
-      name: "product development/organization-infra"
+    repositories:
+        - repository: organization-infra
+          type: git
+          name: "product development/organization-infra"
 
 trigger:
     batch: true
@@ -29,97 +38,208 @@ trigger:
         exclude:
             - docs
 
-pool: "Agent Pool organization"
+pool: "Agent Pool Organization"
 
 stages:
-  - stage: "Build"
-    jobs:
-    - deployment: build
-      continueOnError: false
-      environment: 'dev'
-      variables:
-      - group: dev-key-vault-credential
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - checkout: self
+    - stage: "Build"
+      jobs:
+          - deployment: build
+            continueOnError: false
+            environment: "dev"
+            variables:
+                - group: dev-key-vault-credential
+            strategy:
+                runOnce:
+                    deploy:
+                        steps:
+                            - checkout: self
+                              persistCredentials: true
 
-              - template: 'templates/installJava.yml@organization-infra'
+                            - script: |
+                                echo "Current Environment is: $(entorno)"
+                                echo "DefaultWorkingDirectory is $(System.DefaultWorkingDirectory)"
+                              displayName: "00 - Environment"
+                            
+                            - template: "templates/installzip.yml@organization-infra"
+                              parameters:
+                                  message: "01 - Install Zip"
 
-              - template: 'templates/installSOPS.yml@organization-infra'
+                            - template: "templates/installJava.yml@organization-infra"
 
-              - template: 'templates/decryptSOPS.yml@organization-infra'
-                parameters:
-                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: "16.16.0"
+                              displayName: "02 - Install Node.js"
 
-              - template: 'templates/dotnetBuild.yml@organization-infra'
-                parameters:
-                  SonarProjectKey: "organization_organization-backoffice-api"
-                  SonarProjectName: "organization-backoffice-api"
-                  PublishProject: "organization.BackOffice.Api.Web.csproj"
+                            - task: SonarCloudPrepare@1
+                              inputs:
+                                  SonarCloud: "Sonar Cloud"
+                                  organization: "organization"
+                                  scannerMode: "CLI"
+                                  configMode: "manual"
+                                  cliProjectKey: "organization_organization-backoffice-ui"
+                                  cliProjectName: "organization-backoffice-ui"
+                                  cliSources: "."
+                                  extraProperties: "sonar.javascript.lcov.reportPaths=./coverage/lcov.info"
+                              displayName: "03 - Sonar Cloud Prepare"
 
-              - template: "templates/snykTest.yml@organization-infra"
-                parameters:
-                  SolutionPath: "./src/organization.BackOffice.Api.sln"
+                            - script: |
+                                  git config --global user.email 'dev.tools@progresol.com'
+                                  git config --global user.name 'Dev Tool Progresol'
+                              continueOnError: true
+                              displayName: "04 - Git Name and User"
 
-  - stage: "Build_sta"
-    dependsOn: "Build"
-    condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
-    jobs:
-    - deployment: build
-      continueOnError: false
-      environment: 'sta'
-      variables:
-      - group: dev-key-vault-credential
-      strategy:
-       runOnce:
-         deploy:
-           steps:
-             - checkout: self
+                            - task: CmdLine@2
+                              displayName: 'Descargar archivo usando curl'
+                              inputs:
+                                script: 'curl -o "$(System.ArtifactsDirectory)/.npmrc" https://organization.blob.core.windows.net/feed-pipeline/.npmrc'
 
-             - template: 'templates/installJava.yml@organization-infra'
+                            - script: |
+                                  npm install -g yarn
+                                  yarn -v
+                                  yarn install
+                              continueOnError: true
+                              displayName: "05 - Yarn Install"
 
-             - template: 'templates/installSOPS.yml@organization-infra'
+                            - template: "templates/installSOPS.yml@organization-infra"
 
-             - template: 'templates/decryptSOPS.yml@organization-infra'
-               parameters:
-                 FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                 DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                            - template: "templates/decryptSOPS.yml@organization-infra"
+                              parameters:
+                                  FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
+                                  DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env"
+                            
+                            - script: |
+                                echo "Print env"
+                                ls -la
+                                cat .env
+                              displayName: "Print cat env"
 
-             - template: 'templates/dotnetBuild.yml@organization-infra'
-               parameters:
-                SonarProjectKey: "organization_organization-backoffice-api"
-                SonarProjectName: "organization-backoffice-api"
-                PublishProject: "organization.BackOffice.Api.Web.csproj"
+                            - script: |
+                                  yarn build:dev
+                              displayName: "07 - Build"
+                              continueOnError: false
 
-  - stage: "Build_prd"
-    dependsOn: "Build"
-    condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
-    jobs:
-    - deployment: build
-      continueOnError: false
-      environment: 'prd'
-      variables:
-      - group: dev-key-vault-credential
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - checkout: self
+                            - script: |
+                                  #yarn test --json --outputFile=output.json
+                                  yarn test:coverage
+                              continueOnError: true
+                              displayName: "08 - Testing"
+                            
+                            - script: |
+                                echo "PublishCodeCoverageResults"
+                              displayName: "09 - Publish Tests PublishCodeCoverageResults"
 
-              - template: 'templates/installJava.yml@organization-infra'
+                            - task: PublishTestResults@2
+                              inputs:
+                                  testResultsFormat: "JUnit"
+                                  testResultsFiles: "**/*unit.xml"
+                                  mergeTestResults: true
+                              displayName: "10 - Publish Tests Results"
 
-              - template: 'templates/installSOPS.yml@organization-infra'
+                            - task: SonarCloudAnalyze@1
+                              continueOnError: false
+                              displayName: "11 - Sonar Cloud Analyze"
 
-              - template: 'templates/decryptSOPS.yml@organization-infra'
-                parameters:
-                  FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
-                  DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+                            - task: SonarCloudPublish@1
+                              inputs:
+                                  pollingTimeoutSec: "300"
+                              displayName: "12 - Sonar Cloud Publish"
 
-              - template: 'templates/dotnetBuild.yml@organization-infra'
-                parameters:
-                  SonarProjectKey: "organization_organization-backoffice-api"
-                  SonarProjectName: "organization-backoffice-api"
-                  PublishProject: "organization.BackOffice.Api.Web.csproj"
+                            - task: SnykSecurityScan@1
+                              inputs:
+                                  serviceConnectionEndpoint: "snyk"
+                                  testType: "app"
+                                  monitorWhen: "always"
+                                  failOnIssues: false
+                              continueOnError: true
+                              displayName: "13 - Security Scan"
+
+                            - task: PublishBuildArtifacts@1
+                              inputs:
+                                  #PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+                                  PathtoPublish: "./dist"
+                                  ArtifactName: "drop"
+                              displayName: "15 - Publish to Azure DevOps Artifacts"
+
+    - stage: "Build_Sta_Prd"
+      dependsOn: "Build"
+      condition: and(succeeded(),or(contains(variables['Build.SourceBranch'], '-rc'), contains(variables['Build.SourceBranch'], '-ga')))
+      jobs:
+          - deployment: build_sta_prd
+            continueOnError: false
+            environment: "sta"
+            variables:
+                - group: dev-key-vault-credential
+            strategy:
+                runOnce:
+                    deploy:
+                        steps:
+                            - checkout: self
+
+                            - script: |
+                                  echo "Current Environment is: $(entorno)"
+                                  echo "##vso[task.setvariable variable=entorno;]sta"
+                                  echo "Current Environment is: $(entorno)"
+                              continueOnError: true
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+                              displayName: "00 - Check If It is Sta"
+
+                            - script: |
+                                  echo "Current Environment is: $(entorno)"
+                                  echo "##vso[task.setvariable variable=entorno;]prd"
+                                  echo "Current Environment is: $(entorno)"
+                              continueOnError: true
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+                              displayName: "00 - Check If It is Prd"
+
+                            - template: "templates/installzip.yml@organization-infra"
+                              parameters:
+                                  message: "00 - Install Zip"
+
+                            - task: NodeTool@0
+                              inputs:
+                                  versionSpec: "16.16.0"
+                              displayName: "01 - Install Node.js"
+
+                            - template: "templates/installSOPS.yml@organization-infra"
+
+                            - template: "templates/decryptSOPS.yml@organization-infra"
+                              parameters:
+                                  FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
+                                  DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env"
+
+                            - task: CmdLine@2
+                              displayName: 'Descargar archivo usando curl'
+                              inputs:
+                                script: 'curl -o "$(System.ArtifactsDirectory)/.npmrc" https://organization.blob.core.windows.net/feed-pipeline/.npmrc'
+
+                            - script: |
+                                  npm install -g yarn
+                                  yarn -v
+                                  yarn install
+                              continueOnError: true
+                              displayName: "04 - Yarn Install"
+
+                            - script: |
+                                  yarn build:dev
+                              displayName: "07.0 - Build"
+                              continueOnError: false
+                              
+                            - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+                              displayName: "07.1 - Tag Build"
+                              inputs:
+                                  tags: "rc-build"
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+
+                            - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
+                              displayName: "07.2 - Tag Build"
+                              inputs:
+                                  tags: "ga-build"
+                              condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
+
+                            - task: PublishBuildArtifacts@1
+                              inputs:
+                                  #PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+                                  PathtoPublish: "./dist"
+                                  ArtifactName: "drop"
+                              displayName: "12 - Publish to Azure DevOps Artifacts"
