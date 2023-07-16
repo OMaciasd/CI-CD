@@ -22,7 +22,7 @@
 
 ## Configure Task for cd.yml file in Azure DevOps project with any Linux App Webs for Azure Resources Deploys
 
-![Alt text](image.png)
+![Alt text](image-9.png)
 
 ## Configure Task for cd.yml file in Azure DevOps project with any Static Webs App for Azure Resources Deploys
 
