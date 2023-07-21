@@ -2,7 +2,7 @@
 
 ## Enable Unit Test as a Review for Pull Request for Build pipeline in Continous Integration
 
-![Alt text](image-policy-branch.png)
+![Alt text](Captura de pantalla 2023-07-21 171125.png)
 
 ## Enable Artifact after Build project pipeline in Continous Integration
 
