@@ -1,0 +1,17 @@
+parameters:
+  FileToDecryptFileWithPath: ''
+  DecryptedFileWithPath: ''
+
+steps:
+ - task: Bash@3
+   displayName:  "00 - Decrypt SOPS"
+   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+   inputs:
+     targetType: 'inline'
+     script: |
+       export AZURE_CLIENT_ID=$(AZURE-CLIENT-ID)
+       export AZURE_TENANT_ID=$(AZURE-TENANT-ID)
+       export AZURE_CLIENT_SECRET=$(AZURE-CLIENT-SECRET)
+       
+       sops -d ${{ parameters.FileToDecryptFileWithPath }} > ${{ parameters.DecryptedFileWithPath }}
+       #cat ${{ parameters.DecryptedFileWithPath }}

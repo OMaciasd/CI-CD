@@ -2,7 +2,11 @@
 
 ## Enable Unit Test as a Review for Pull Request for Build pipeline in Continous Integration
 
-![Alt text](Captura de pantalla 2023-07-21 171125.png)
+![Alt text](branch-policy.png)
+
+![Alt text](branch-policy-3.png)
+
+![Alt text][def]
 
 ## Enable Artifact after Build project pipeline in Continous Integration
 
@@ -41,3 +45,5 @@
 ## Evidence ID Path for ci.yml file in Azure DevOps project with any Artifactory Feed Build for Version published to Azure
 
 ![Alt text](image-8.png)
+
+[def]: branch-policy-2.png

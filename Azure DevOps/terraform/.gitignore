@@ -1,0 +1,6 @@
+terraform.exe
+terraform.tfstate*
+.terraform.lock.hcl
+.terraform*
+src/main.tfplan
+src/main.tfplan.json

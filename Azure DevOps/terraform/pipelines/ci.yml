@@ -1,0 +1,100 @@
+resources:
+  repositories:
+    - repository: nanaykuna-infra
+      type: git
+      name: "product development/nanaykuna-infra"
+
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - src
+    exclude:
+    - docs
+    - pipelines
+
+pool: "Agent Pool Nanaykuna"
+
+variables:
+  System.Debug: true
+
+stages:
+
+- stage: "ValidadeVNETPeering"
+  displayName: "01.01 - Validade VNET & Peering"
+  jobs:
+
+  - job: validate
+    continueOnError: false
+    steps:
+
+    - template: 'templates/installzip.yml@nanaykuna-infra'
+      parameters:
+        message: 'Install Zip'
+
+    - template: 'templates/terraformInstall.yml@nanaykuna-infra'
+
+    - task: TerraformTaskV3@3
+      displayName: "01.01.01 - Init Terraform"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: 'Azure'
+        backendAzureRmResourceGroupName: 'rginfradevops'
+        backendAzureRmStorageAccountName: 'infraci'
+        backendAzureRmContainerName: 'nanaykuna-infra'
+        backendAzureRmKey: 'terraforn.vnetpeering.tfstate'
+        commandOptions: '--var-file=terraform.dev.tfvars'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/src/vnet-peering'
+    - task: TerraformTaskV3@3
+      displayName: "01.01.02 - Validate Terraform"
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+
+- stage: "DeployVNETPeering"
+  displayName: "01.02 - Deploy VNET & Peering"
+  jobs:
+  - deployment: deploy_terraform
+    continueOnError: false
+    environment: 'dev'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+           - checkout: self
+
+           - template: 'templates/installzip.yml@nanaykuna-infra'
+             parameters:
+               message: 'Install Zip'
+       
+           - template: 'templates/terraformInstall.yml@nanaykuna-infra'
+
+           - task: TerraformTaskV3@3
+             displayName: "Init Terraform"
+             inputs:
+               provider: 'azurerm'
+               command: 'init'
+               backendServiceArm: 'Azure'
+               backendAzureRmResourceGroupName: 'rginfradevops'
+               backendAzureRmStorageAccountName: 'infraci'
+               backendAzureRmContainerName: 'nanaykuna-infra'
+               backendAzureRmKey: 'terraforn.vnetpeering.tfstate'
+               commandOptions: '--var-file=terraform.dev.tfvars'
+               workingDirectory: '$(System.DefaultWorkingDirectory)/src/vnet-peering'
+
+           - task: TerraformTaskV3@3
+             displayName: "01.02.02 - Terraform Plan"
+             inputs:
+               provider: 'azurerm'
+               command: 'plan'
+               commandOptions: '--var-file=terraform.dev.tfvars'
+               workingDirectory: '$(System.DefaultWorkingDirectory)/src/vnet-peering'
+               environmentServiceNameAzureRM: 'Azure'
+
+           - script: |
+                cd /agent/_work/1/s/src/vnet-peering
+                terraform plan --var-file=terraform.dev.tfvars
+             displayName: "01.02.03 - Terraform Apply"
