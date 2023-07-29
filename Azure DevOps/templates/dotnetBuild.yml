@@ -2,6 +2,10 @@ parameters:
   SonarProjectKey: ""
   SonarProjectName: ""
   PublishProject: ""
+  - name: skipTask
+    displayName: Skip Task
+    type: boolean
+  SkipSonarTask: false
 
 steps:
   # - script: |
@@ -49,7 +53,7 @@ steps:
     displayName: "T05 - Sonar Cloud Analyze"
 
   - task: SonarCloudPublish@1
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    condition: and(succeeded(), eq(${{ parameters.SkipSonarTask }}, false), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       pollingTimeoutSec: "300"
     displayName: "T06 - Sonar Cloud Publish"
