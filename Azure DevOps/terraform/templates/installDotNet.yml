@@ -1,0 +1,12 @@
+steps:
+- script: |
+   wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+   sudo dpkg -i packages-microsoft-prod.deb
+   sudo rm packages-microsoft-prod.deb
+
+   sudo rm /var/lib/dpkg/lock-frontend
+   sudo dpkg --configure -a
+
+   sudo apt-get update && \
+     sudo apt-get install -y dotnet-sdk-6.0
+  displayName: '00 - Install dotnet'

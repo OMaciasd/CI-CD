@@ -1,0 +1,28 @@
+#cloud-config
+package_upgrade: true
+packages: 
+  - curl
+  - npm
+  - default-jre
+  - default-jdk
+
+runcmd:  
+  - echo "Install dotnet"
+  - wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+  - dpkg -i packages-microsoft-prod.deb
+  - rm packages-microsoft-prod.deb
+  - rm /var/lib/dpkg/lock-frontend
+  - dpkg --configure -a
+  - apt-get update 
+  - apt-get install -y dotnet-sdk-6.0    
+  - echo "Install Zip"
+  - rm /var/lib/dpkg/lock-frontend
+  - dpkg --configure -a  
+  - apt install zip -y
+  - apt install unzip -y  
+  - echo "Install sops 3.3.1"
+  - wget https://github.com/mozilla/sops/releases/download/3.3.1/sops_3.3.1_amd64.deb  
+  - apt install ./sops_3.3.1_amd64.deb
+  - echo "Install nvm and nodejs 16.18"  
+  - curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+  - apt install -y nodejs

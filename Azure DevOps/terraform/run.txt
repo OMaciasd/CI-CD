@@ -1,0 +1,4 @@
+terraform init --var-file=terraform.dev.tfvars --backend-config=backend.conf
+terraform validate
+terraform plan --var-file=terraform.dev.tfvars -out main.tfplan
+terraform show -json main.tfplan > main.tfplan.json

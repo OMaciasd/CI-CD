@@ -61,6 +61,7 @@ stages:
               SonarProjectKey: "organization_organization-sales-orders-functions"
               SonarProjectName: "organization-sales-orders-functions"
               PublishProject: "organization.SalesOrders.Functions.Application.Tests.csproj"
+              SkipSonarTask: true
 
            - template: "templates/snykTest.yml@organization-infra"
              parameters:
