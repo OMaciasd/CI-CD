@@ -1,0 +1,16 @@
+parameters:
+  message: ''
+
+steps:
+- task: Bash@3
+  displayName: "00 - Install Unzip"
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Install Unzip
+      sudo rm /var/lib/dpkg/lock-frontend
+      sudo dpkg --configure -a
+      sudo apt-get update
+      sudo apt install zip -y
+      sudo apt install unzip -y
+      echo "##vso[task.setvariable variable=CurrentAgentName;isOutput=true;]$(Agent.Name)"

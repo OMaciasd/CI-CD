@@ -1,0 +1,7 @@
+steps:
+- script: |
+   sudo apt install default-jre -y
+   sudo apt install default-jdk -y
+   sudo apt autoremove
+  displayName: '00 - Install JAVA'
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
