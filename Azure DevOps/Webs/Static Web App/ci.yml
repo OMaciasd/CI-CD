@@ -20,9 +20,9 @@ variables:
 
 resources:
     repositories:
-        - repository: organization-infra
+        - repository: nanaykuna-infra
           type: git
-          name: "product development/organization-infra"
+          name: "product development/nanaykuna-infra"
 
 trigger:
     batch: true
@@ -38,7 +38,7 @@ trigger:
         exclude:
             - docs
 
-pool: "Agent Pool Organization"
+pool: "Agent Pool Nanaykuna"
 
 stages:
     - stage: "Build"
@@ -56,29 +56,34 @@ stages:
                               persistCredentials: true
 
                             - script: |
-                                echo "Current Environment is: $(entorno)"
-                                echo "DefaultWorkingDirectory is $(System.DefaultWorkingDirectory)"
+                                  echo "Current Environment is: $(entorno)"
+                                  echo "DefaultWorkingDirectory is $(System.DefaultWorkingDirectory)"
                               displayName: "00 - Environment"
-                            
-                            - template: "templates/installzip.yml@organization-infra"
+
+                            - template: "templates/installzip.yml@nanaykuna-infra"
                               parameters:
                                   message: "01 - Install Zip"
 
-                            - template: "templates/installJava.yml@organization-infra"
+                            - template: "templates/installJava.yml@nanaykuna-infra"
 
                             - task: NodeTool@0
                               inputs:
                                   versionSpec: "16.16.0"
                               displayName: "02 - Install Node.js"
 
+                            - task: CmdLine@2
+                              displayName: "Listar Carpeta Public"
+                              inputs:
+                                  script: "ls ./public"
+
                             - task: SonarCloudPrepare@1
                               inputs:
                                   SonarCloud: "Sonar Cloud"
-                                  organization: "organization"
+                                  organization: "nanaykuna"
                                   scannerMode: "CLI"
                                   configMode: "manual"
-                                  cliProjectKey: "organization_organization-backoffice-ui"
-                                  cliProjectName: "organization-backoffice-ui"
+                                  cliProjectKey: "nanaykuna_nanaykuna-backoffice-ui"
+                                  cliProjectName: "nanaykuna-backoffice-ui"
                                   cliSources: "."
                                   extraProperties: "sonar.javascript.lcov.reportPaths=./coverage/lcov.info"
                               displayName: "03 - Sonar Cloud Prepare"
@@ -90,33 +95,62 @@ stages:
                               displayName: "04 - Git Name and User"
 
                             - task: CmdLine@2
-                              displayName: 'Descargar archivo usando curl'
+                              displayName: "Descargar archivo usando curl"
                               inputs:
-                                script: 'curl -o "$(System.ArtifactsDirectory)/.npmrc" https://organization.blob.core.windows.net/feed-pipeline/.npmrc'
+                                  script: |
+                                    'curl -o "$(System.ArtifactsDirectory)/.npmrc" https://nanaykuna.blob.core.windows.net/feed-pipeline/.npmrc'
+                                    ls -a
 
                             - script: |
                                   npm install -g yarn
                                   yarn -v
                                   yarn install
+                                  ls
                               continueOnError: true
                               displayName: "05 - Yarn Install"
 
-                            - template: "templates/installSOPS.yml@organization-infra"
+                            - task: CmdLine@2
+                              displayName: "00 - Set nanaykuna-ui-kit build in public resources"
+                              inputs:
+                                  script: |
+                                    ls
+                                    "cp -r ./node_modules/nanaykuna-ui-kit/dist/nanaykuna-ui-kit ./public"
 
-                            - template: "templates/decryptSOPS.yml@organization-infra"
+                            #- script: |
+                            #      yarn run standard-version
+                            #      current_message=$(git show -s --format=%s)
+                            #     echo $current_message
+                            #      commit_message="${current_message} [ci skip]"
+                            #      echo $commit_message
+                            #      git commit --amend -m --no-verify "$commit_message"
+                            #      git push --follow-tags --no-verify origin HEAD:$(Build.SourceBranchName)
+                            #  continueOnError: true
+                            #  displayName: "06 - Run Version"
+
+                            - template: "templates/installSOPS.yml@nanaykuna-infra"
+
+                            - template: "templates/decryptSOPS.yml@nanaykuna-infra"
                               parameters:
                                   FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
                                   DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env"
-                            
+
                             - script: |
-                                echo "Print env"
-                                ls -la
-                                cat .env
+                                  echo "Print env"
+                                  ls -la
+                                  cat .env
                               displayName: "Print cat env"
 
                             - script: |
+                                  git fetch --tags
+                                  LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+                                  echo "Last tag: $LAST_TAG"
+                              displayName: "07.0 - Git Tag"
+                              continueOnError: false
+
+                            - script: |
+                                  yarn run pre-build
                                   yarn build:dev
-                              displayName: "07 - Build"
+                              displayName: "07.1 - Build"
                               continueOnError: false
 
                             - script: |
@@ -124,10 +158,16 @@ stages:
                                   yarn test:coverage
                               continueOnError: true
                               displayName: "08 - Testing"
-                            
+
                             - script: |
-                                echo "PublishCodeCoverageResults"
+                                  echo "PublishCodeCoverageResults"
                               displayName: "09 - Publish Tests PublishCodeCoverageResults"
+
+                            #- task: PublishCodeCoverageResults@1
+                            #  inputs:
+                            #      codeCoverageTool: Cobertura
+                            #      summaryFileLocation: "$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml"
+                            #  displayName: "09 - Publish Tests PublishCodeCoverageResults"
 
                             - task: PublishTestResults@2
                               inputs:
@@ -140,10 +180,10 @@ stages:
                               continueOnError: false
                               displayName: "11 - Sonar Cloud Analyze"
 
-                            - task: SonarCloudPublish@1
-                              inputs:
-                                  pollingTimeoutSec: "300"
-                              displayName: "12 - Sonar Cloud Publish"
+                            #- task: SonarCloudPublish@1
+                            #inputs:
+                            #pollingTimeoutSec: "300"
+                            #displayName: "12 - Sonar Cloud Publish"
 
                             - task: SnykSecurityScan@1
                               inputs:
@@ -153,6 +193,15 @@ stages:
                                   failOnIssues: false
                               continueOnError: true
                               displayName: "13 - Security Scan"
+
+                            #- task: ArchiveFiles@2
+                            #   inputs:
+                            #rootFolderOrFile: "./dist"
+                            #includeRootFolder: false
+                            #archiveType: "zip"
+                            #archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+                            #replaceExistingArchive: true
+                            #displayName: "14 - Publish locally"
 
                             - task: PublishBuildArtifacts@1
                               inputs:
@@ -192,7 +241,7 @@ stages:
                               condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
                               displayName: "00 - Check If It is Prd"
 
-                            - template: "templates/installzip.yml@organization-infra"
+                            - template: "templates/installzip.yml@nanaykuna-infra"
                               parameters:
                                   message: "00 - Install Zip"
 
@@ -201,17 +250,12 @@ stages:
                                   versionSpec: "16.16.0"
                               displayName: "01 - Install Node.js"
 
-                            - template: "templates/installSOPS.yml@organization-infra"
+                            - template: "templates/installSOPS.yml@nanaykuna-infra"
 
-                            - template: "templates/decryptSOPS.yml@organization-infra"
+                            - template: "templates/decryptSOPS.yml@nanaykuna-infra"
                               parameters:
                                   FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
                                   DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env"
-
-                            - task: CmdLine@2
-                              displayName: 'Descargar archivo usando curl'
-                              inputs:
-                                script: 'curl -o "$(System.ArtifactsDirectory)/.npmrc" https://organization.blob.core.windows.net/feed-pipeline/.npmrc'
 
                             - script: |
                                   npm install -g yarn
@@ -221,18 +265,26 @@ stages:
                               displayName: "04 - Yarn Install"
 
                             - script: |
-                                  yarn build:dev
-                              displayName: "07.0 - Build"
+                                  git fetch --tags
+                                  LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+                                  echo "Last tag: $LAST_TAG"
+                              displayName: "07.0 - Git Tag"
                               continueOnError: false
-                              
+
+                            - script: |
+                                  yarn run pre-build
+                                  yarn build
+                              displayName: "07.1 - Build"
+                              continueOnError: false
+
                             - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
-                              displayName: "07.1 - Tag Build"
+                              displayName: "07.2 - Tag Build"
                               inputs:
                                   tags: "rc-build"
                               condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
 
                             - task: colinsalmcorner.colinsalmcorner-buildtasks.tag-build-task.tagBuildOrRelease@0
-                              displayName: "07.2 - Tag Build"
+                              displayName: "07.3 - Tag Build"
                               inputs:
                                   tags: "ga-build"
                               condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
