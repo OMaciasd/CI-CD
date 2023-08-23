@@ -53,6 +53,11 @@ stages:
                 parameters:
                   FileToDecryptFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.$(environment.name).enc.json'
                   DecryptedFileWithPath: '$(System.DefaultWorkingDirectory)/src/organization.BackOffice.Api.Web/appsettings.json'
+              
+              - template: "templates/decryptSOPS.yml@nanaykuna-infra"
+                parameters:
+                  FileToDecryptFileWithPath: "$(System.DefaultWorkingDirectory)/env.enc.$(entorno)"
+                  DecryptedFileWithPath: "$(System.DefaultWorkingDirectory)/.env.development"
 
               - template: 'templates/dotnetBuild.yml@organization-infra'
                 parameters:
@@ -108,6 +113,21 @@ stages:
           deploy:
             steps:
               - checkout: self
+
+              - script: |
+                    echo "Current Environment is: $(entorno)"
+                    echo "##vso[task.setvariable variable=entorno;]sta"
+                    echo "Current Environment is: $(entorno)"
+                continueOnError: true
+                condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-rc'))
+                displayName: "00 - Check If It is Sta"
+
+              - script: |
+                    echo "Current Environment is: $(entorno)"
+                    echo "##vso[task.setvariable variable=entorno;]prd"
+                    echo "Current Environment is: $(entorno)"
+                continueOnError: true
+                condition: and(succeeded(), contains(variables['Build.SourceBranch'], '-ga'))
 
               - template: 'templates/installJava.yml@organization-infra'
 
