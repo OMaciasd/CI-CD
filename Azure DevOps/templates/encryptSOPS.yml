@@ -1,0 +1,39 @@
+---
+parameters:
+  FileToEncryptWithPath: ''
+
+steps:
+- script: |
+    export AZURE_CLIENT_ID=$(AZURE-CLIENT-ID)
+    export AZURE_TENANT_ID=$(AZURE-TENANT-ID)
+    export AZURE_CLIENT_SECRET=$(AZURE-CLIENT-SECRET)
+ 
+    # Intento de cifrar con redirección de errores a un archivo
+    sops -e ${{ parameters.FileToEncryptWithPath }} > appsettings.enc.json 2> error_log.txt
+
+    # Imprimir cualquier error que sops pueda haber producido
+    cat error_log.txt
+
+    echo "Tamaño del archivo cifrado:"
+    du -sh appsettings.enc.json
+
+    # Crear un directorio para el artefacto
+    mkdir -p $(Build.ArtifactStagingDirectory)/encryptedFiles
+       
+    # Copiar el archivo cifrado al directorio del artefacto
+    cp appsettings.enc.json $(Build.ArtifactStagingDirectory)/encryptedFiles/
+    ls $(Build.ArtifactStagingDirectory)/encryptedFiles
+  displayName: 'Encrypt and Copy'
+
+# Publicar el artefacto
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/encryptedFiles'
+    ArtifactName: 'encryptedFiles'
+    publishLocation: 'Container'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(System.DefaultWorkingDirectory)/error_log.txt'
+    ArtifactName: 'error_logs'
+    publishLocation: 'Container'
