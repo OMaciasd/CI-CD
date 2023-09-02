@@ -1,34 +1,55 @@
----
 parameters:
-  FileToDecryptFileWithPath: ""
-  FileToDecryptFileWithPath2: ""
-  FileToDecryptFileWithPath3: ""
-  DecryptedFileWithPath: ""
+  FileToDecryptFileWithPath: ''
+  FileToDecryptFileWithPath2: ''
+  FileToDecryptFileWithPath3: ''
+  DecryptedFileWithPath: ''
 
 steps:
   - script: |
+      # Primero, imprimimos el valor para comprobar que está siendo configurado correctamente
+      echo "File to Decrypt: ${{ parameters.FileToDecryptFileWithPath }}"
+      
       # Comprueba que FileToDecryptFileWithPath esté definida y no esté vacía
       if [[ -z "${{ parameters.FileToDecryptFileWithPath }}" ]]; then
-        echo "Error: FileToDecryptFileWithPath es una variable requerida y no puede estar vacía."
+        echo "Error: FileToDecryptFileWithPath is a required variable and cannot be empty."
         exit 1
       fi
-
-      # Si FileToDecryptFileWithPath contiene "dev"
+      
+      # Verifica si el archivo a descifrar existe
+      if [[ ! -f "${{ parameters.FileToDecryptFileWithPath }}" ]]; then
+        echo "Error: The file to decrypt does not exist."
+        exit 1
+      fi
+      
+      # Configura las variables de entorno
+      export AZURE_CLIENT_ID=$(AZURE-CLIENT-ID)
+      export AZURE_TENANT_ID=$(AZURE-TENANT-ID)
+      export AZURE_CLIENT_SECRET=$(AZURE-CLIENT-SECRET)
+      
+      # Si el archivo contiene "dev", procede con el descifrado
       if [[ "${{ parameters.FileToDecryptFileWithPath }}" == *"dev"* ]]; then
-        sops -d ${{ parameters.FileToDecryptFileWithPath }} > ${{ parameters.DecryptedFileWithPath }}
-        
-        # Si FileToDecryptFileWithPath2 está definida, desencripta
-        if [[ -n "${{ parameters.FileToDecryptFileWithPath2 }}" ]]; then
-          sops -d ${{ parameters.FileToDecryptFileWithPath2 }} > ${{ parameters.DecryptedFileWithPath }}-2
-        fi
-
-        # Si FileToDecryptFileWithPath3 está definida, desencripta
-        if [[ -n "${{ parameters.FileToDecryptFileWithPath3 }}" ]]; then
-          sops -d ${{ parameters.FileToDecryptFileWithPath3 }} > ${{ parameters.DecryptedFileWithPath }}-3
-        fi
+        echo "Starting decryption of dev file..."
+      # Si el archivo no contiene "dev", procede con el descifrado al archivo alternativo
       else
-        # Si FileToDecryptFileWithPath no contiene "dev"
-        sops -d ${{ parameters.FileToDecryptFileWithPath }} > ${{ parameters.DecryptedFileWithPath }}
+        echo "Starting alternative decryption..."
       fi
 
-    displayName: 00 - Decrypt SOPS
+      sops -d ${{ parameters.FileToDecryptFileWithPath }} > ${{ parameters.DecryptedFileWithPath }}
+      if [ $? -eq 0 ]; then
+        echo "Decryption successful!"
+      else
+        echo "Decryption failed!"
+      fi
+      
+      # Si FileToDecryptFileWithPath2 está definida, desencripta
+      if [[ -n "${{ parameters.FileToDecryptFileWithPath2 }}" ]]; then
+        sops -d ${{ parameters.FileToDecryptFileWithPath2 }} > ${{ parameters.DecryptedFileWithPath }}-2
+      fi
+
+      # Si FileToDecryptFileWithPath3 está definida, desencripta
+      if [[ -n "${{ parameters.FileToDecryptFileWithPath3 }}" ]]; then
+        sops -d ${{ parameters.FileToDecryptFileWithPath3 }} > ${{ parameters.DecryptedFileWithPath }}-3
+      fi
+
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    displayName:  "00 - Decrypt SOPS"
