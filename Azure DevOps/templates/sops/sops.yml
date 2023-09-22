@@ -1,0 +1,36 @@
+---
+# Plantilla SOPS para Azure
+# Esta plantilla proporciona los pasos necesarios para inicializar SOPS y luego invoca 
+# otras plantillas que instalan SOPS y cifran un archivo usando SOPS.
+#
+# Parámetros:
+# - pat: Token personal de acceso utilizado para autenticar con SOPS.
+
+parameters:
+  - name: pat
+    type: string
+    default: ''
+
+steps:
+  # Verifica si se ha proporcionado el parámetro 'pat'
+  - script: |
+      if [ -z "${{ parameters.pat }}" ]; then
+        echo "Error: El parámetro 'pat' no ha sido proporcionado o es una cadena vacía."
+        exit 1
+      fi
+    displayName: 'Verificación del parámetro pat'
+
+  # Inicializa SOPS con el token personal de acceso proporcionado
+  - script: |
+      eval $(SOPS_PAT)
+    displayName: 'Initialize SOPS'
+    env:
+      SOPS_PAT: ${{ parameters.pat }}
+
+  # Invoca una plantilla para instalar SOPS
+  - template: "../installSOPS.yml@nanaykuna-infra"
+
+  # Invoca otra plantilla para cifrar un archivo utilizando SOPS
+  - template: "../encryptSOPS.yml@nanaykuna-infra"
+    parameters:
+      FileToEncryptWithPath: "$(System.DefaultWorkingDirectory)/appsettings.json"
